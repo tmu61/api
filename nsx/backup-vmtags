@@ -1,0 +1,45 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                      : Display help"
+        echo "  -d <backup directory>i  : directory to save the backup to"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset BACKUP_DIR BACKUP_FILE
+
+while getopts "hd:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		d)
+			BACKUP_DIR="$OPTARG"
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+BACKUP_DIR=$(echo $BACKUP_DIR|sed -e 's#/*$##')
+[ -z "$BACKUP_DIR" ] && BACKUP_DIR=$PWD
+echo "BACKUP_DIR=$BACKUP_DIR"
+BACKUP_FILE=$BACKUP_DIR/$(date '+%d.%m.%Y-%H.%M.%S-backup.json')
+GET /api/v1/fabric/virtual-machines >$BACKUP_FILE
+echo $BACKUP_FILE

@@ -1,0 +1,73 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+	echo "  -p                  : display policies"
+	echo "  -r                  : display rules"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset DUMMY #unset any variables that you think you should
+
+while getopts "hpr" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		p)
+			CHECK_POLICIES="YES"
+			;;
+		r)
+			CHECK_RULES="YES"
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+
+if [ "$CHECK_POLICIES" == YES ]
+then
+	BLUE; echo checking policies; NC
+	GET /policy/api/v1/infra/domains/default/security-policies|jq -r '.results[].display_name' | while read policy_name
+	do
+		# let's see if this is a policy with TEMP in the name
+		if echo $policy_name|grep -i 'temp' >/dev/null
+		then
+			echo "TEMP Policy: \"$policy_name\" "
+		fi
+	done
+fi
+
+if [ "$CHECK_RULES" == YES ]
+then
+	BLUE; echo checking rules; NC
+	GET /policy/api/v1/infra/domains/default/security-policies|jq -r '.results[].display_name' | while read policy_name
+	do
+		policy_id=$( GET /policy/api/v1/infra/domains/default/security-policies| jq -r ".results[]|select (.display_name==\"$policy_name\").id" )
+		GET /policy/api/v1/infra/domains/default/security-policies/$policy_id|jq -r '.rules[].display_name' | while read rule_name
+		do
+			if echo $rule_name|grep -i 'temp' >/dev/null
+			then
+				echo "Temporary Rule in policy \"$policy_name\": \"$rule_name\" "
+			fi
+		done
+	done
+fi
+

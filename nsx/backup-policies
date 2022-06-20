@@ -1,0 +1,58 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                      : Display help"
+        echo "  -d <backup directory>   : directory to save the backup to"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset BACKUP_DIR BACKUP_FILE
+
+while getopts "hd:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+                d)
+                        BACKUP_DIR="$OPTARG"
+                        ;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+BACKUP_DIR=$(echo $BACKUP_DIR|sed -e 's#/*$##')
+[ -z "$BACKUP_DIR" ] && BACKUP_DIR=$PWD
+BACKUP_SUBDIR=$BACKUP_DIR/DFW-backup-$(date '+%d.%m.%Y-%H.%M.%S')
+if [ ! -d $BACKUP_SUBDIR ]
+then
+	mkdir -p $BACKUP_SUBDIR
+fi
+echo "BACKUP_SUBDIR=$BACKUP_SUBDIR"
+
+GET /policy/api/v1/infra/domains/default/security-policies|jq -r '.results[].display_name' | while read policy_name
+do
+	BLUE; echo $policy_name; NC
+	policy_id=$( GET /policy/api/v1/infra/domains/default/security-policies| jq -r ".results[]|select (.display_name==\"$policy_name\").id" )
+	echo /policy/api/v1/infra/domains/default/security-policies/$policy_id
+	GET /policy/api/v1/infra/domains/default/security-policies/$policy_id > $BACKUP_SUBDIR/"$policy_id".json
+done
+
+
+

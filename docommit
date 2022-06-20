@@ -1,0 +1,61 @@
+#!/bin/bash
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+        echo "  -v <version>        : set verison"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset VERSION
+
+while getopts "hv:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VERSION=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+
+if [ -z "$VERSION" ]
+then
+	echo "-v <version> is required"
+	exit 1
+fi
+
+docker stop api
+docker commit api api:$VERSION
+docker rm api
+sed -i -e "s/api:.*/api:$VERSION/" runapi
+docker tag api:$VERSION mtai72/api:$VERSION
+docker tag api:$VERSION mtai72/api:latest
+docker push mtai72/api:$VERSION
+docker push mtai72/api:latest
+docker tag api:$VERSION harbor.soeldner-consult.de/api/api:$VERSION
+docker tag api:$VERSION harbor.soeldner-consult.de/api/api:latest
+docker push harbor.soeldner-consult.de/api/api:$VERSION
+docker push harbor.soeldner-consult.de/api/api:latest
+
+./runapi
+sleep 5
+scp -P 2222 .zsh_history root@localhost:
+

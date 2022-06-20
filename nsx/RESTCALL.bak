@@ -1,0 +1,166 @@
+#!/bin/bash
+
+export RESTCALL_VERSION=0.12.17
+
+restcall() {
+: '
+Usage:
+restcall METHOD URL [infile.json]
+Example:
+restcall GET /api/2.0/services/ipset/scope/universalroot-0
+
+This function will call a RESTful API.
+It requires the following information:
+
+REST_ENDPOINT: FQDN of your API endpoint
+
+'
+	METHOD=$1
+	URL=$2
+	local TMPFILE=$(mktemp)
+
+	if [ $# -gt 2 ]
+	then
+		REST_BODY=$3
+	fi
+
+	if [ -z "$REST_ENDPOINT" ]
+	then
+		echo "you need to set REST_ENDPOINT" >&2
+		return 2
+	fi
+
+	REST_AUTHINFO=~/creds/${REST_ENDPOINT}.auth
+	if [ ! -f $REST_AUTHINFO ]
+	then
+		echo "file does not exist: $REST_AUTHINFO"
+		return 1
+	fi
+
+	REST_BASICAUTH=$(cat $REST_AUTHINFO|head -1)
+	REST_AUTHMETHOD=$(cat $REST_AUTHINFO|head -2|tail -1)
+
+	[ $REST_DEBUG ] && echo "REST_AUTHMETHOD: $REST_AUTHMETHOD" >&2
+#set -x
+	case $REST_AUTHMETHOD in
+		1)      # works for NSX-v and NSX-T
+			if [ -z "$REST_BODY" ]
+			then 
+				curl --crlf -k -u "$REST_BASICAUTH" -X $METHOD -H "X-Allow-Overwrite: true" -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+			else 
+				curl --crlf -k -u "$REST_BASICAUTH" -X $METHOD $OVERRIDE -H "Content-Type: application/json" -d @$REST_BODY -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+			fi
+			;;
+
+		2)      # works for SDDC MANAGER
+			if [ -z "$REST_BODY" ]
+			then 
+				curl --crlf -k -X $METHOD -H "Authorization: $BEARER" $OVERRIDE -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+			else 
+				curl --crlf -k -X $METHOD -H "Authorization: $BEARER" $OVERRIDE -H "Content-Type: application/json" -d @$REST_BODY -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+			fi
+			;;
+
+		3)      # works for vCenter
+			if [ -z "$SESSION_ID" ]
+			then
+				SESSION_ID=$(curl --crlf -s -k -u "$REST_BASICAUTH" -X POST -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}/rest/com/vmware/cis/session | jq -r '.value' 2>&1 )
+				echo retrieved SESSION_ID $SESSION_ID >&2
+			fi
+                        if [ -z "$REST_BODY" ]
+                        then
+                                curl --crlf -k -X $METHOD -H "vmware-api-session-id: $SESSION_ID" $OVERRIDE -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+                        else
+                                curl --crlf -k -X $METHOD -H "vmware-api-session-id: $SESSION_ID" $OVERRIDE $REST_HDR1 "Content-Type: application/json" -d @$REST_BODY -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>&1 >$TMPFILE
+                        fi
+                        ;;
+
+			
+		*)
+			echo "invalid REST_AUTHMETHOD=$REST_AUTHMETHOD"
+			return 1
+			;;
+	esac
+	#RC=$(cat $TMPFILE|geterrorcode.pl 2>/dev/null)
+	cat $TMPFILE
+#	rm $TMPFILE
+	if [ -z "$RC" ]
+	then
+		return 0
+	else
+		return $RC
+	fi
+	unset REST_BODY
+}
+
+GET() {
+	restcall GET $*
+}
+
+
+POST() {
+	if [ -f /data/.RESTCALL.readonly ]
+	then
+		RED
+		echo "file /data/.RESTCALL.readonly exists, write methods disabled"
+		NC
+		return 100
+	fi
+	restcall POST $*
+}
+
+PUT() {
+	if [ -f /data/.RESTCALL.readonly ]
+	then
+		RED
+		echo "file /data/.RESTCALL.readonly exists, write methods disabled"
+		NC
+		return 100
+	fi
+	restcall PUT $*
+}
+
+PATCH() {
+	if [ -f /data/.RESTCALL.readonly ]
+	then
+		RED
+		echo "file /data/.RESTCALL.readonly exists, write methods disabled"
+		NC
+		return 100
+	fi
+	restcall PATCH $*
+}
+
+DELETE() {
+	if [ -f /data/.RESTCALL.readonly ]
+	then
+		RED
+		echo "file /data/.RESTCALL.readonly exists, write methods disabled"
+		NC
+		return 100
+	fi
+	restcall DELETE $*
+}
+
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+BLUE() {
+        [ "$RESTCALL_NOCOLORS" ] || printf $BLUE
+}
+
+GREEN() {
+        [ "$RESTCALL_NOCOLORS" ] || printf $GREEN
+}
+
+RED() {
+        [ "$RESTCALL_NOCOLORS" ] || printf $RED
+}
+
+NC() {
+        [ "$RESTCALL_NOCOLORS" ] || printf $NC
+}
+

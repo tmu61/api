@@ -1,0 +1,100 @@
+#!/bin/bash
+. RESTCALL
+
+usage() {
+	echo
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+	echo "  -v <VM>             : Display name of the VM"
+	echo "  -t <TAG>            : Tag"
+	echo "  -s <SCOPE>          : Scope"
+	echo
+        echo "  -h                  : Display help"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "v:t:s:h" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VM=$OPTARG
+			;;
+		t)
+			TAG=$OPTARG
+			;;
+		s)
+			SCOPE=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+E=0
+if [ -z "$VM" ]
+then
+	RED
+	echo "VM is required"
+	NC
+	E=1
+fi
+
+if [ -z "$TAG" ]
+then
+	RED
+	echo "TAG is required"
+	NC
+	E=1
+fi
+
+if [ -z "$SCOPE" ]
+then
+	RED
+	echo "SCOPE is required"
+	NC
+	E=1
+fi
+if [ "$E" = "1" ]
+then
+	usage
+	exit 1
+fi
+
+ALLVMS_JSON=$(GET /api/v1/fabric/virtual-machines)
+
+TAGS=$(echo $ALLVMS_JSON | jq ".results[]|select (.display_name==\"$VM\")|.tags |= .+ [ { \"scope\": \"$SCOPE\", \"tag\": \"$TAG\" } ] | .tags")
+ID=$(echo $ALLVMS_JSON | jq ".results[]|select (.display_name==\"$VM\")"|jq -r '.external_id')
+L=$(echo $ID|wc -c)
+
+if [ "$L" -eq 1 ]
+then
+	echo $VM not found
+	exit 1
+fi
+
+
+JSON=$(mktemp)
+
+echo '{' >>$JSON
+echo "    \"external_id\": \"$ID\"," >>$JSON
+echo '    "tags": ' >>$JSON
+echo "        $TAGS" >>$JSON
+echo '}' >>$JSON
+
+[ "$DEBUG" ] && cat $JSON
+POST "/api/v1/fabric/virtual-machines?action=update_tags $JSON"
+rm $JSON

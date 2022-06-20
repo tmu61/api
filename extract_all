@@ -1,0 +1,16 @@
+#!/usr/bin/zsh
+#COPY bin /usr/local/bin
+scp -r -P 2222 root@localhost:/usr/local/bin .
+#COPY .oh-my-zsh /root/.oh-my-zsh
+#COPY .p10k.zsh /root
+#COPY .zshrc /root
+scp -P 2222 root@localhost:.zshrc .
+#COPY .bashrc /root
+scp -P 2222 root@localhost:.bashrc .
+#COPY .ssh/* /root/.ssh/
+#COPY nsx /root/nsx/
+scp -r -P 2222 root@localhost:nsx .
+
+#others
+scp -r -P 2222 root@localhost:.zsh_history .
+

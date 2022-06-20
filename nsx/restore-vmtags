@@ -1,0 +1,102 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+        echo "  -v <VM>             : Virtual machine name"
+        echo "  -f <FILENAME>       : File to use for restore"
+        echo "  -d <DIRECTORY>      : Directory where backups are located"
+        echo ""
+}
+
+complain() {
+	RED
+	echo $*
+	usage
+	NC
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "hv:f:d:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VM=$OPTARG
+			;;
+		f)
+			BACKUP_FILE=$OPTARG
+			;;
+		d)
+			BACKUP_DIR=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+if [ -z "$VM" ]
+then
+	complain "VM is required"
+	exit 1
+fi
+
+[ -z $BACKUP_DIR ] && BACKUP_DIR=$PWD
+
+if echo $BACKUP_FILE | grep '/' >/dev/null
+then
+	complain "Don't use '/' slash in file name"
+	exit 4
+fi
+
+if [ -z "$BACKUP_FILE" ]
+then
+	BACKUP_FILE=$(ls -t $BACKUP_DIR/*-backup.json | head -1)
+else
+	BACKUP_FILE=$BACKUP_DIR/$BACKUP_FILE
+fi
+
+vm_backup=$(cat "$BACKUP_FILE" | jq ".results[]|select (.display_name==\"$VM\").display_name") 
+if [ -z "$vm_backup" ]
+then
+	complain "$VM not found in backup $BACKUP_FILE"
+	exit 2
+fi
+
+External_ID=$(GET /api/v1/fabric/virtual-machines | jq '.results[]|select (.display_name=="'$VM'")'|jq -r '.external_id')
+if [ -z "$External_ID" ]
+then
+	complain "$VM not found on $REST_ENDPOINT"
+	exit 3
+fi
+
+echo "Restore from $BACKUP_FILE" >&2
+
+TMPFILE=$(mktemp)
+TAGS=$(cat "$BACKUP_FILE" | jq ".results[]|select (.display_name==\"$VM\").tags" )
+echo "{ \"external_id\": \"$External_ID\"," >$TMPFILE
+echo "\"tags\": $TAGS" >>$TMPFILE
+echo "}" >>$TMPFILE
+echo $TMPFILE
+POST /api/v1/fabric/virtual-machines\?action=update_tags $TMPFILE
+
+
+
+
+
+

@@ -1,0 +1,89 @@
+#!/bin/bash
+. RESTCALL
+
+usage() {
+	echo
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+	echo "  -v <VM>             : Display name of the VM"
+	echo "  -t <TAG>            : Tag"
+	echo "  -s <SCOPE>          : Scope"
+	echo
+        echo "  -h                  : Display help"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "v:t:s:h" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VM=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+shift $(( OPTIND -1 ))
+
+if [ ! -f /data/.mandatory_tags ]
+then
+	RED
+	echo "This script requires the file \"/data/.mandatory_tags\""
+	echo "This file needs to specify the mandatory tag scopes in the following format:"
+	echo "   MANDATORY_TAGS=\"scope1 scope2 scope3\""
+	NC
+	exit 3
+fi
+
+. /data/.mandatory_tags
+
+TMPFILE=$(mktemp)
+GET /api/v1/fabric/virtual-machines > $TMPFILE
+#cat $TMPFILE|jq '.results[]|select(.display_name|match ("^dummy-vm[1-6]$")).display_name' | while read VM
+cat $TMPFILE|jq '.results[].display_name' | while read VM
+do
+	unset MISSING_TAGS
+	VMJSON=$(jq ".results[]|select (.display_name==$VM)" $TMPFILE)
+	ATAGS=$(jq ".results[]|select (.display_name==$VM)|.tags" $TMPFILE)
+	if [ "$ATAGS" = "null" ] # VM never had any tags
+	then
+		MISSING_TAGS=$MANDATORY_TAGS
+	else
+		TAGS=$(jq ".results[]|select (.display_name==$VM)|.tags[]" $TMPFILE 2>/dev/null)
+		for CURRENT_TAG in $MANDATORY_TAGS
+		do
+			CURRENT_RESULT=$(echo $TAGS|jq "select(.scope==\"$CURRENT_TAG\")")
+			CURRENT_CHARS=$(echo $CURRENT_RESULT|wc -c|cut -f 1 -d ' ')
+			if [ $CURRENT_CHARS = "1" ]
+			then
+				MISSING_TAGS="$MISSING_TAGS $CURRENT_TAG" 
+			fi
+		done
+		MISSING_TAGS=${MISSING_TAGS# }
+	fi
+	if [ ! -z "$MISSING_TAGS" ]
+	then
+		unset EXCLUDED_VM
+		if echo $VM | grep -f /data/excluded_vms >/dev/null
+		then
+			EXCLUDED_VM=true
+		fi
+		if [ -z "$EXCLUDED_VM" ]
+		then
+			echo "$VM: $MISSING_TAGS"
+		fi
+	fi
+done
+

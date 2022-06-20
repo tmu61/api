@@ -1,0 +1,77 @@
+#!/bin/bash
+. RESTCALL
+
+usage() {
+	echo
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+	echo "  -v <VM>             : Display name of the VM"
+        echo "  -h                  : Display help"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "v:h" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VM=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+E=0
+if [ -z "$VM" ]
+then
+	RED
+	echo "VM is required"
+	NC
+	E=1
+fi
+
+if [ "$E" = "1" ]
+then
+	usage
+	exit 1
+fi
+
+[ "$DEBUG" ] && echo "VM=$VM"
+
+ID=$(GET /api/v1/fabric/virtual-machines | jq ".results[]|select (.display_name==\"$VM\")"|jq -r '.external_id')
+L=$(echo $ID|wc -c)
+
+if [ "$L" -eq 1 ]
+then
+        echo $VM not found
+        exit 1
+fi
+
+JSON=$(mktemp)
+
+echo '{' >>$JSON
+echo "    \"external_id\": \"$ID\"," >>$JSON
+echo '    "tags": [' >>$JSON
+echo '    ]' >>$JSON
+echo '}' >>$JSON
+
+[ "$DEBUG" ] && cat $JSON
+
+POST "/api/v1/fabric/virtual-machines?action=update_tags $JSON"
+
+rm $JSON
+

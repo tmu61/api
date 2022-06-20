@@ -1,0 +1,34 @@
+#!/bin/bash
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "h" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+. RESTCALL
+
+GET /policy/api/v1/infra/tier-0s|jq ".results[].display_name"

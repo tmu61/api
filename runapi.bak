@@ -1,0 +1,2 @@
+docker run --name api  -d -v ~/creds:/root/creds -v ~/data:/data api:.0.8
+docker exec -it api /usr/bin/zsh
