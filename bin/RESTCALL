@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export RESTCALL_VERSION=0.12.25
+export RESTCALL_VERSION=0.12.26
 
 restcall() {
 : '
@@ -162,5 +162,23 @@ RED() {
 
 NC() {
         [ "$RESTCALL_NOCOLORS" ] || printf $NC
+}
+
+apisetup() {
+        echo -n "Endpoint FQDN/IP: "
+        read REST_ENDPOINT
+        export REST_ENDPOINT
+        if [ ! -f ~/creds/$REST_ENDPOINT.auth ]
+        then
+                echo "you need to setup the file ~/creds/$REST_ENDPOINT.auth in the following format:"
+                echo
+                echo "  username:password"
+                echo "  <Auth method>"
+                echo
+                echo "For <Auth method> use a single digit:"
+                echo "  1 for NSX-v or NSX-T"
+                echo "  2 for SDDC Manager"
+                echo "  3 for vCenter"
+        fi
 }
 
