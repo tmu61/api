@@ -1,0 +1,116 @@
+#!/bin/bash
+# stretch a vcf cluster
+# REQUIRED: create the file ~/creds/vcfauth in the following format
+#
+#{
+#"username": "administrator@vsphere.local",
+#"password": "VMware1!"
+#}
+#
+#Also get the file nsxcall-json and put it into ~/bin/nsxcall-json
+#
+
+. RESTCALL
+
+######## Change the following settings ########
+HOSTS="vcf05.sclabs.net vcf06.sclabs.net vcf07.sclabs.net vcf08.sclabs.net"
+#Use a license key that is known by sddc manager
+HOSTLIC=H503L-ZT0DL-58HGH-0Z10P-3HM0J # this one was unknown to sddc manager! Added it - works.
+CLUSTER=cl01
+SDDCMANAGER=vcfsddc.sclabs.net
+#In case the Overlay VLANs are different, use the one of AZ2
+OverlayVLAN=216
+#Make sure witness is new and can be resolved
+WitnessFQDN=vcfwitness.sclabs.net
+vsanCidr=10.20.41.0/24
+vsanIp=10.20.41.10
+
+######## don't change anything below ########
+
+#Due to historic reasons, GET, PUT etc. use NSXMGR as the target
+NSXMGR=$SDDCMANAGER
+BEARER=$(POST /v1/tokens ~/creds/vcfauth|jq -r '.accessToken')
+BEARER="Bearer $BEARER"
+CLUSTERID=$(GET /v1/clusters|jq -r ".elements[]|select (.name==\"$CLUSTER\")|.id")
+NHOSTS=$(echo $HOSTS|wc -w)
+
+#Now generate the update spec"
+i=1
+{
+echo "{"
+echo "  \"clusterUpdateSpec\" : {    "
+echo "    \"clusterStretchSpec\": {"
+echo "        \"hostSpecs\": [ {"
+for h in $HOSTS
+do
+	HOSTID=$(GET /v1/hosts|jq ".elements[]|select (.fqdn==\"$h\")|.id")
+	echo "            \"id\": $HOSTID",
+	echo "            \"licenseKey\": \"$HOSTLIC\""
+	if [ $i -eq $NHOSTS ]
+	then
+		echo "        } ],"
+	else
+		echo "        },  {"
+	fi
+	((i++))
+done
+echo "        \"secondaryAzOverlayVlanId\": $OverlayVLAN,"
+echo "        \"isEdgeClusterConfiguredForMultiAZ\":true,"
+echo "        \"witnessSpec\": {"
+echo "            \"fqdn\": \"$WitnessFQDN\","
+echo "            \"vsanCidr\": \"$vsanCidr\","
+echo "            \"vsanIp\": \"$vsanIp\""
+echo "        } "
+echo "      }"
+echo "    }"
+echo "  }"
+} >updatespec.json
+
+cat updatespec.json
+POST /v1/clusters/$CLUSTERID/validations updatespec.json >verify.json
+
+RES=$(jq -r '.validationChecks[0].resultStatus' <verify.json)
+
+if [ "$RES" != "SUCCEEDED" ]
+then
+	echo "something went wrong"
+	cat verify.json|jq
+else
+
+i=1
+{
+echo "{"
+echo "    \"clusterStretchSpec\": {"
+echo "        \"hostSpecs\": [ {"
+for h in $HOSTS
+do
+	HOSTID=$(GET /v1/hosts|jq ".elements[]|select (.fqdn==\"$h\")|.id")
+	echo "            \"id\": $HOSTID",
+	echo "            \"licenseKey\": \"$HOSTLIC\""
+	if [ $i -eq $NHOSTS ]
+	then
+		echo "        } ],"
+	else
+		echo "        },  {"
+	fi
+	((i++))
+done
+echo "        \"secondaryAzOverlayVlanId\": $OverlayVLAN,"
+echo "        \"isEdgeClusterConfiguredForMultiAZ\":true,"
+echo "        \"witnessSpec\": {"
+echo "            \"fqdn\": \"$WitnessFQDN\","
+echo "            \"vsanCidr\": \"$vsanCidr\","
+echo "            \"vsanIp\": \"$vsanIp\""
+echo "        } "
+echo "      }"
+echo "  }"
+} >stretchspec.json
+
+cat stretchspec.json
+PATCH /v1/clusters/$CLUSTERID stretchspec.json | jq
+
+GREEN
+echo "Now go to sddc manager and watch the tasks"
+NC
+
+fi

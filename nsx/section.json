@@ -1,0 +1,33 @@
+{
+  "id": "1005",
+  "name": "testapi",
+  "description": "",
+  "generationNumber": "1638789211299",
+  "timestamp": 1638789211299,
+  "tcpStrict": false,
+  "stateless": false,
+  "useSid": false,
+  "type": "LAYER3",
+  "rules": [
+    {
+      "name": "testrule1",
+      "id": 1006,
+      "disabled": false,
+      "action": "allow",
+      "logged": false,
+      "appliedToList": {
+        "appliedToList": [
+          {
+            "name": "DISTRIBUTED_FIREWALL",
+            "value": "DISTRIBUTED_FIREWALL",
+            "type": "DISTRIBUTED_FIREWALL",
+            "isValid": true
+          }
+        ]
+      },
+      "sectionId": "1005",
+      "direction": "inout",
+      "packetType": "any"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+docker run --name apigit -p 2223:22 -d -v ~/creds:/root/creds -v ~/data:/data -v /root/.ssh:/root/.ssh api-from-git:0.1

@@ -1,0 +1,84 @@
+#!/bin/bash
+
+#source RESTCALL
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -g <Tier-0>         : Tier-0 gateway display name"
+        echo "  -t <TZ>             : Transport Zone Display Name"
+        echo "  -h                  : Display help"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset T0 TZ
+
+while getopts "hg:t:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		g)
+			T0=$OPTARG
+			;;
+		t)
+			TZ=$OPTARG
+			;;
+
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+if [ -z "$T0" ]
+then
+	RED; echo "-g <Tier-0> is required"; NC
+	exit 1
+fi
+
+if [ -z "$TZ" ]
+then
+	RED; echo "-t <TZ> is required"; NC
+	exit 1
+fi
+
+
+shift $(( OPTIND -1 ))
+
+tmpfile=$(mktemp)
+
+export APP_TZPATH=$(GET /policy/api/v1/infra/sites/default/enforcement-points/default/transport-zones|jq ".results[]|select (.display_name==\"$TZ\").path")
+L=$(echo $APP_TZPATH|wc -c)
+if [ $L -eq 1 ]
+then
+	echo "Transport Zone \"$TZ\" does not exist"
+	exit 2
+fi
+echo $APP_TZPATH
+
+export APP_T0=$(GET /policy/api/v1/infra/tier-0s|jq ".results[]|select (.display_name==\"$T0\").path")
+L=$(echo $APP_T0|wc -c)
+if [ $L -eq 1 ]
+then
+	echo "Tier-0 \"$T0\" does not exist"
+	exit 2
+fi
+echo $APP_T0
+
+
+envsubst < /data/3tier-var.json > $tmpfile
+
+PATCH /policy/api/v1/infra $tmpfile
+
+echo $tmpfile

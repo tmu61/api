@@ -1,0 +1,97 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+        echo "  -g <group>          : Group display_name"
+        echo "  -f <FILENAME>       : File to use for restore"
+        echo "  -d <DIRECTORY>      : Directory where backups are located"
+        echo ""
+}
+
+complain() {
+	RED
+	echo $*
+	usage
+	NC
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "hg:f:d:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		g)
+			GROUP=$OPTARG
+			;;
+		f)
+		
+			BACKUP_FILE="$OPTARG"
+			if echo $BACKUP_FILE|grep "/"
+			then
+				RED
+				echo "filename must not contain '/'"
+				echo "use -d <backup directory> to specify the path"
+				useage
+				exit 3
+			fi
+			;;
+
+		d)
+			BACKUP_DIR=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+if [ -z "$GROUP" ]
+then
+	complain "GROUP is required"
+	exit 1
+fi
+
+[ -z $BACKUP_DIR ] && BACKUP_DIR=$PWD
+
+if [ -z "$BACKUP_FILE" ]
+then
+	BACKUP_FILE=$(ls -t $BACKUP_DIR/groups-backup-*.json | head -1)
+else
+	BACKUP_FILE=$BACKUP_DIR/$BACKUP_FILE
+fi
+
+if [ ! -f $BACKUP_FILE ]
+then
+	RED
+	echo "something went wrong"
+	echo "file \"BACKUP_FILE\" does not exist"
+	exit 4
+fi
+
+GROUP_JSON=$(mktemp)
+cat $BACKUP_FILE | jq ".results[]|select (.display_name==\"$GROUP\")" >$GROUP_JSON
+FILESIZE=$(wc -c $GROUP_JSON | cut -f 1 -d ' ')
+if [ $FILESIZE -eq 0 ]
+then
+	echo "group $GROUP not found in $BACKUP_FILE"
+	exit 5
+fi
+
+GROUP_ID=$(cat $GROUP_JSON|jq -r '.id')
+PATCH /policy/api/v1/infra/domains/default/groups/$GROUP_ID $GROUP_JSON
+GET /policy/api/v1/infra/domains/default/groups/$GROUP_ID

@@ -1,0 +1,87 @@
+#!/bin/bash
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+	echo "  -v <VM>             : Display name of the VM"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+while getopts "hv:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		v)
+			VM=$OPTARG
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+. RESTCALL
+
+if [ -z "$VM" ]
+then
+	RED
+	echo "VM is required"
+	NC
+	usage
+	exit 1
+fi
+
+ALLVMS_JSON=$(GET /api/v1/fabric/virtual-machines)
+ID=$(echo $ALLVMS_JSON | jq ".results[]|select (.display_name==\"$VM\")"|jq -r '.external_id')
+L=$(echo $ID|wc -c)
+
+if [ "$L" -eq 1 ]
+then
+	echo VM \"$VM\" not found, so it\'s not a member of any group
+	exit 1
+fi
+
+
+#GET /policy/api/v1/infra/domains/default/groups|jq '.results[]|{display_name,id}' | while read GROUP_JSON
+TEMP_GROUPS=$(mktemp)
+GET /policy/api/v1/infra/domains/default/groups > $TEMP_GROUPS
+NGROUPS=$(cat $TEMP_GROUPS|jq '.result_count')
+echo $NGROUPS
+#cat $TEMP_GROUPS|jq '.results[]|select(.display_name|match("^w")).display_name' | while read GROUP_DISPLAY
+cat $TEMP_GROUPS|jq '.results[].display_name' | while read GROUP_DISPLAY
+do
+	printf "\r     \r$NGROUPS"
+	NGROUPS=$((NGROUPS-1))
+	GROUP_ID=$(cat $TEMP_GROUPS|jq -r ".results[] | select (.display_name == $GROUP_DISPLAY) .id")
+	CURRENT_GROUP_JSON=$(mktemp)
+	GET /policy/api/v1/infra/domains/default/groups/$GROUP_ID/members/virtual-machines > $CURRENT_GROUP_JSON
+	echo " -> $GROUP_ID"
+	result_count=$(cat $CURRENT_GROUP_JSON|jq '.result_count')
+	[ -z "$result_count" ] && result_count=-1
+	if [ $result_count -gt 0 ]
+	then
+		cat $CURRENT_GROUP_JSON|jq -r '.results[].display_name' | while read DISPLAY_NAME
+		do
+			if [ "$DISPLAY_NAME" = "$VM" ]
+			then
+				echo
+				echo "$GROUP_DISPLAY"
+			fi
+		done
+	fi
+	#echo "$GROUP_DISPLAY: \"$result_count\""
+	rm $CURRENT_GROUP_JSON
+done

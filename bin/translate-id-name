@@ -1,0 +1,58 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                      : Display help"
+        echo "  -d <backup directory>   : directory with the backup files"
+        echo ""
+}
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset BACKUP_DIR 
+
+while getopts "hd:" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+                d)
+                        BACKUP_DIR="$OPTARG"
+                        ;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+if [ -z "$BACKUP_DIR" ]
+then
+	RED; echo "-d <backup directory> is required"; NC
+	usage
+	exit 1
+fi
+
+if [ ! -d "$BACKUP_DIR" ]
+then
+	RED; echo "directory $BACKUP_DIR does not exist"; NC
+	usage
+	exit 2
+fi
+
+for BACKUP_FILE in $(ls $BACKUP_DIR)
+do
+	echo -n "$BACKUP_FILE: "
+	cat $BACKUP_DIR/$BACKUP_FILE | jq '.display_name'
+done

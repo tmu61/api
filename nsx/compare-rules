@@ -1,0 +1,45 @@
+#!/bin/bash
+. nsxcall-json
+
+# This script requires a variable called "section"
+if [ -z "$section" ]
+then
+	echo "This script requires a variable called \"section\""
+	echo "In case it's not empty, consider using \"export section\""
+	exit 1
+fi
+
+. /data/nsxv
+num_of_rules_v=$(GET /api/4.0/firewall/globalroot-0/config|jq ".layer3Sections.layer3Sections[]|select (.name==\"$section\")|.rules"|jq length)
+
+. /data/nsxt
+policy_id=$( GET /policy/api/v1/infra/domains/default/security-policies| jq -r ".results[]|select (.display_name==\"$section\").id" )
+num_of_rules_t=$(GET /policy/api/v1/infra/domains/default/security-policies/$policy_id|jq '.rules'|jq length )
+
+if [ $num_of_rules_t -eq $num_of_rules_v ]
+then
+	[ $DEBUG ] && echo "\"$section\" NSX-v: $num_of_rules_v NSX-T:  $num_of_rules_t - OK"
+	PREFIX="OK_"
+else
+	PREFIX="DIFF_"
+	difference=$(($num_of_rules_v - $num_of_rules_t))
+	
+	[ $DEBUG ] && echo "\"$section\" NSX-v: $num_of_rules_v NSX-T:  $num_of_rules_t - ${difference#-} differences found"
+	if [ $difference -gt 0 ]
+	then
+		[ $DEBUG ] && GREEN
+		[ $DEBUG ] && echo $difference rules missing on NSX-T
+	else
+		[ $DEBUG ] && RED
+		[ $DEBUG ] && echo ${difference#-} rules missing on NSX-v
+	fi
+fi
+NC
+t_rules_tmp=$(mktemp -p /data/nsx/reports)
+v_rules_tmp=$(mktemp -p /data/nsx/reports)
+$HOME/nsx/get-section-rules | sort > $v_rules_tmp
+$HOME/nsx/get-policy-rules | sort > $t_rules_tmp
+diff $t_rules_tmp $v_rules_tmp 
+diff $t_rules_tmp $v_rules_tmp > /data/nsx/reports/$PREFIX"$section"
+rm $t_rules_tmp $v_rules_tmp 
+

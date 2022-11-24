@@ -1,0 +1,98 @@
+#!/bin/bash
+
+. RESTCALL
+
+usage() {
+        echo "usage: ${0##*/} [options]"
+        echo ""
+        echo "Options:"
+        echo "  -h                  : Display help"
+        echo "  -f <filename>       : restore from this file"
+	echo "  -d                  : delete rules that have been added"
+        echo ""
+}
+
+complain() {
+	RED
+	echo $*
+	usage
+	NC
+}
+
+
+#---------------------------------------------------------------------------------------------------------
+# Parse arguments
+
+unset DELETE_RULES 
+
+while getopts "hf:d" opt; do
+        case $opt in
+                h)
+                        usage
+                        exit 0
+                        ;;
+		f)
+			RESTORE_FILENAME=$OPTARG
+			;;
+		d)
+			DELETE_RULES="true"
+			;;
+                \?)
+                        echo "Invalid option: $OPTARG" >&2
+                        usage
+                        exit 2
+                        ;;
+                :)
+                        echo "Option -$OPTARG requires an argument."
+        esac
+done
+
+shift $(( OPTIND -1 ))
+
+if [ -z "$RESTORE_FILENAME" ]
+then
+	complain "-f <filename> is required"
+	exit 1
+fi
+
+if [ ! -f "$RESTORE_FILENAME" ]
+then
+	complain "$RESTORE_FILENAME does not exisit!"
+	exit 2
+fi
+
+#cat $RESTORE_FILENAME | jq '.rules[].id'
+RESTORE_PATH=/policy/api/v1$(cat "$RESTORE_FILENAME"|jq -r '.path')
+
+
+# Deleting rules that have been added after backup
+eval GET $RESTORE_PATH | jq '.rules[].id' 2>/dev/null | while read realized_id
+do
+	backup_id=$(cat $RESTORE_FILENAME|jq ".rules[]|select (.id=="$realized_id").id")
+	backup_id=$(echo $backup_id|tr -d '[\n\r]')
+	if [ -z "$backup_id" ]
+	then
+		if  [ "$DELETE_RULES" ]
+		then
+			DELPATH=$(GET $RESTORE_PATH | jq -r ".rules[]|select (.id==$realized_id).path")
+			echo DELETE /policy/api/v1$DELPATH
+			DELETE /policy/api/v1$DELPATH
+		else
+			RED
+			echo "Rule with ID $realized_id has been added since the backup"
+			echo "run this command with -d to cleanup"
+			NC
+		fi
+	fi
+done
+
+PATCH $RESTORE_PATH $RESTORE_FILENAME
+
+
+
+
+
+
+
+
+
