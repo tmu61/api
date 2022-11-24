@@ -15,7 +15,6 @@ RUN sed -i -e 's/root:x:0:0:root:\/root:\/bin\/bash/root:x:0:0:root:\/root:\/usr
 COPY oh-my-zsh.tgz /root
 RUN cd /root && tar xvzf oh-my-zsh.tgz
 COPY bin /usr/local/bin
-COPY .oh-my-zsh /root/.oh-my-zsh
 COPY .p10k.zsh /root
 COPY .zshrc /root
 COPY .bashrc /root
