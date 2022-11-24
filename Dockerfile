@@ -11,6 +11,7 @@ apt-get install -y openssh-server && \
   echo "/bin/sleep 3650d" >>/startup && \
   mkdir /root/creds && mkdir /root/.oh-my-zsh
 RUN apt-get install -y less
+RUN sed -i -e 's/root:x:0:0:root:\/root:\/bin\/bash/root:x:0:0:root:\/root:\/usr\/bin\/zsh/' /etc/passwd
 COPY bin /usr/local/bin
 COPY .oh-my-zsh /root/.oh-my-zsh
 COPY .p10k.zsh /root
