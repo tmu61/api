@@ -18,7 +18,6 @@ COPY bin /usr/local/bin
 COPY .p10k.zsh /root
 COPY .zshrc /root
 COPY .bashrc /root
-COPY .ssh/* /root/.ssh/
 COPY nsx /root/nsx/
 COPY shadow /etc
 CMD ["/bin/bash", "/startup"]
