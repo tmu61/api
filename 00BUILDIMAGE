@@ -1,5 +1,4 @@
 #!/bin/bash
-tar xvzf extract-this.tgz
 docker build -t api:0.9 .
 
 

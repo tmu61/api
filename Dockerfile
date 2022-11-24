@@ -12,6 +12,8 @@ apt-get install -y openssh-server && \
   mkdir /root/creds && mkdir /root/.oh-my-zsh
 RUN apt-get install -y less
 RUN sed -i -e 's/root:x:0:0:root:\/root:\/bin\/bash/root:x:0:0:root:\/root:\/usr\/bin\/zsh/' /etc/passwd
+COPY oh-my-zsh.tgz /root
+RUN cd /root && tar xvzf oh-my-zsh.tgz
 COPY bin /usr/local/bin
 COPY .oh-my-zsh /root/.oh-my-zsh
 COPY .p10k.zsh /root
