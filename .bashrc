@@ -118,8 +118,3 @@ fi
 
 . RESTCALL
 PATH=$HOME/bin:$PATH
-
-
-alias v='export NSXMGR=nsxv.sclabs.net'
-alias t='export NSXMGR=nsxm.sclabs.net'
-
