@@ -1,9 +1,0 @@
-#!/bin/bash
-. nsxcall-json
-. /data/nsxv
-
-[ "$DEBUG" ] && echo "$section"
-num_of_rules=$(GET /api/4.0/firewall/globalroot-0/config|jq ".layer3Sections.layer3Sections[]|select (.name==\"$section\")|.rules"|jq length)
-[ $DEBUG ] && echo $num_of_rules 
-GET /api/4.0/firewall/globalroot-0/config|jq ".layer3Sections.layer3Sections[]|select (.name==\"$section\")|.rules[].name" | sort
-
