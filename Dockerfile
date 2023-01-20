@@ -19,5 +19,6 @@ COPY .p10k.zsh /root
 COPY .zshrc /root
 COPY .bashrc /root
 COPY nsx /root/nsx/
+RUN chmod +x /root/nsx/*
 COPY shadow /etc
 CMD ["/bin/bash", "/startup"]
