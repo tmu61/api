@@ -7,28 +7,27 @@
 #"password": "VMware1!"
 #}
 #
-#Also get the file nsxcall-json and put it into ~/bin/nsxcall-json
 #
 
 . RESTCALL
 
 ######## Change the following settings ########
-HOSTS="vcf05.sclabs.net vcf06.sclabs.net vcf07.sclabs.net vcf08.sclabs.net"
+# ESXi hosts used to stretch the cluster
+HOSTS="host5.sddc.net host6.sddc.net host7.sddc.net host8.sddc.net"
 #Use a license key that is known by sddc manager
-HOSTLIC=H503L-ZT0DL-58HGH-0Z10P-3HM0J # this one was unknown to sddc manager! Added it - works.
-CLUSTER=cl01
-SDDCMANAGER=vcfsddc.sclabs.net
+HOSTLIC=ABCDE-12345-FGHIJ-12345-FGHIJ # this one was unknown to sddc manager! Added it - works.
+CLUSTER=cluster1
+SDDCMANAGER=sddc-manager.sddc.net
 #In case the Overlay VLANs are different, use the one of AZ2
 OverlayVLAN=216
 #Make sure witness is new and can be resolved
-WitnessFQDN=vcfwitness.sclabs.net
+WitnessFQDN=vcfwitness.sddc.net
 vsanCidr=10.20.41.0/24
 vsanIp=10.20.41.10
 
 ######## don't change anything below ########
 
-#Due to historic reasons, GET, PUT etc. use NSXMGR as the target
-NSXMGR=$SDDCMANAGER
+REST_ENDPOINT=$SDDCMANAGER
 BEARER=$(POST /v1/tokens ~/creds/vcfauth|jq -r '.accessToken')
 BEARER="Bearer $BEARER"
 CLUSTERID=$(GET /v1/clusters|jq -r ".elements[]|select (.name==\"$CLUSTER\")|.id")
