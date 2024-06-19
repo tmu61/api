@@ -6,8 +6,6 @@ restcall() {
 : '
 Usage:
 restcall METHOD URL [infile.json]
-Example:
-restcall GET /api/2.0/services/ipset/scope/universalroot-0
 
 This function will call a RESTful API.
 It requires the following information:
