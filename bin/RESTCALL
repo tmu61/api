@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#This is a curl wrapper that permits running RESTful API calls like
+#GET /policy/api/v1/infra/segments
+
 export RESTCALL_VERSION=0.12.25
 
 restcall() {
@@ -41,7 +44,7 @@ REST_ENDPOINT: FQDN of your API endpoint
 	[ $REST_DEBUG ] && echo "REST_AUTHMETHOD: $REST_AUTHMETHOD" >&2
 #set -x
 	case $REST_AUTHMETHOD in
-		1)      # works for NSX-v and NSX-T
+		1)      # works for NSX-v (deprecated), NSX-T, NSX and (partially) AVI (multi tenancy to be implemented)
 			if [ -z "$REST_BODY" ]
 			then 
 				curl --crlf -k -u "$REST_BASICAUTH" -X $METHOD -H "X-Allow-Overwrite: true" -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>>/data/rest.log >$TMPFILE
@@ -50,7 +53,7 @@ REST_ENDPOINT: FQDN of your API endpoint
 			fi
 			;;
 
-		2)      # works for SDDC MANAGER
+		2)      # works for VCF SDDC MANAGER
 			if [ -z "$REST_BODY" ]
 			then 
 				curl --crlf -k -X $METHOD -H "Authorization: $BEARER" $OVERRIDE -H "Content-Type: application/json" -H "Accept: application/json" https://${REST_ENDPOINT}${REST_PREFIX}${URL} 2>>/data/rest.log >$TMPFILE
